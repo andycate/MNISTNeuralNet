@@ -9,7 +9,7 @@ class InitType(Enum):
     EPSILON = 4
 
 class Model:
-    def __init__(self, learning_rate, weight_decay_rate, init_type=InitType.RANDOM, epsilon=0.0001):
+    def __init__(self, learning_rate, weight_decay_rate, init_type=InitType.RANDOM, epsilon=0.001):
         self.learning_rate = learning_rate
         self.weight_decay_rate = weight_decay_rate
         if init_type == InitType.NORMAL:
@@ -33,39 +33,46 @@ class Model:
             self.bias_0 = np.ones((256), dtype=np.float32) * epsilon
             self.bias_1 = np.ones((10), dtype=np.float32) * epsilon
 
-    def __sigmoid(self, out):
+    def __sigmoid(self, out): # good
         return 1 / (1 + np.exp(-out))
 
-    def __softmax(self, out):
+    def __softmax(self, out): # good
         raw = np.exp(out)
         return raw / np.repeat(np.sum(raw, axis=0).reshape(1, -1), 10, axis=0)
 
-    def __loss(self, predictions, lbls_logits):
+    def __loss(self, predictions, lbls_logits): # good
         return -np.sum(np.log(predictions) * lbls_logits)
 
-    def minimize(self, imgs, lbls_logits):
-        # run a forward network pass
+    def __ave_loss(self, predictions, lbls_logits):
+        return self.__loss(predictions, lbls_logits) / predictions.shape[1]
+
+    def predict(self, imgs):
         sum_0 = (imgs.transpose().dot(self.theta_0) + np.repeat(self.bias_0.reshape(1, -1), imgs.shape[1], axis=0)).transpose()
         activation_0 = self.__sigmoid(sum_0) # output from hidden layer, for each image (256, <# images>)
         sum_1 = (activation_0.transpose().dot(self.theta_1) + np.repeat(self.bias_1.reshape(1, -1), activation_0.shape[1], axis=0)).transpose()
         activation_1 = self.__softmax(sum_1) # predictions (10, <# images>)
+        return sum_0, activation_0, sum_1, activation_1
 
-        cross_entropy_1 = -np.sum(lbls_logits - activation_1, axis=1).reshape(-1, 1) # total cross entropy across all images
-        cross_entropy_0 = self.theta_1.dot(cross_entropy_1) * np.sum(activation_0 * (1 - activation_0), axis=1).reshape(-1, 1)
+    def minimize(self, imgs, lbls_logits):
+        # run a forward network pass
+        sum_1, activation_1, sum_2, activation_2 = self.predict(imgs) # works
 
-        theta_gradient_1 = np.repeat(cross_entropy_1.transpose(), self.theta_1.shape[0], axis=0) * np.repeat(np.sum(activation_0, axis=1).reshape(-1, 1), self.theta_1.shape[1], axis=1)
-        bias_gradient_1 = cross_entropy_1.reshape(-1)
-        theta_gradient_0 = np.repeat(cross_entropy_0.transpose(), self.theta_0.shape[0], axis=0) * np.repeat(np.sum(imgs, axis=1).reshape(-1, 1), self.theta_0.shape[1], axis=1)
-        bias_gradient_0 = cross_entropy_0.reshape(-1)
+        cross_entropy_2 = -(lbls_logits - activation_2) # total cross entropy across all images
+        cross_entropy_1 = self.theta_1.dot(cross_entropy_2) * (activation_1 * (1 - activation_1))
 
-        self.theta_1 -= theta_gradient_1
-        self.bias_1 -= bias_gradient_1
-        self.theta_0 -= theta_gradient_0
-        self.bias_0 -= bias_gradient_0
+        modified_ce2 = np.repeat(cross_entropy_2.transpose().reshape(1, cross_entropy_2.shape[1], cross_entropy_2.shape[0]), self.theta_1.shape[0], axis=0)
+        modified_a1 = np.swapaxes(np.swapaxes(np.repeat(activation_1.reshape(1, activation_1.shape[0], activation_1.shape[1]), self.theta_1.shape[1], axis=0), 0, 1), 1, 2)
+        theta_gradient_1 = np.average(modified_a1 * modified_ce2, axis=1) + (self.weight_decay_rate * self.theta_1)
 
-    def predict(self, imgs):
-        sum_0 = (imgs.transpose().dot(self.theta_0) + np.repeat(self.bias_0.reshape(1, -1), imgs.shape[1], axis=0)).transpose()
-        activation_0 = self.__sigmoid(sum_0)
-        sum_1 = (activation_0.transpose().dot(self.theta_1) + np.repeat(self.bias_1.reshape(1, -1), activation_0.shape[1], axis=0)).transpose()
-        activation_1 = self.__softmax(sum_1)
-        return activation_1
+        modified_ce1 = np.repeat(cross_entropy_1.transpose().reshape(1, cross_entropy_1.shape[1], cross_entropy_1.shape[0]), self.theta_0.shape[0], axis=0)
+        modified_a0 = np.swapaxes(np.swapaxes(np.repeat(imgs.reshape(1, imgs.shape[0], imgs.shape[1]), self.theta_0.shape[1], axis=0), 0, 1), 1, 2)
+        theta_gradient_0 = np.average(modified_a0 * modified_ce1, axis=1) + (self.weight_decay_rate * self.theta_0)
+
+        bias_gradient_1 = np.average(cross_entropy_2, axis=1)
+        bias_gradient_0 = np.average(cross_entropy_1, axis=1)
+
+        # print(self.learning_rate * theta_gradient_1)
+        self.theta_1 = self.theta_1 - (self.learning_rate * theta_gradient_1)
+        self.theta_0 = self.theta_0 - (self.learning_rate * theta_gradient_0)
+        self.bias_1 = self.bias_1 - (self.learning_rate * bias_gradient_1)
+        self.bias_0 = self.bias_0 - (self.learning_rate * bias_gradient_0)
