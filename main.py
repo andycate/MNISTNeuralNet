@@ -4,7 +4,7 @@ import model
 
 data = da.Data()
 
-mod = model.Model(0.000001, 0.00001, init_type=model.InitType.NORMAL, epsilon=0.0001)
+mod = model.Model(1, 0, init_type=model.InitType.NORMAL, epsilon=0.1)
 
 def accuracy():
     predictions = (np.argmax(mod.predict(data.test_imgs)[3], axis=0) == data.test_lbls)
@@ -13,9 +13,9 @@ def accuracy():
 accuracy()
 
 for i in range(100000):
-    imgs, lbls, logits = data.next_batch(size=1000)
+    imgs, lbls, logits = data.next_batch(size=50)
     mod.minimize(imgs, logits)
-    if i%500 == 0:
+    if i%50 == 0:
         accuracy()
 
 accuracy()

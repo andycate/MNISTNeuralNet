@@ -9,7 +9,7 @@ class InitType(Enum):
     EPSILON = 4
 
 class Model:
-    def __init__(self, learning_rate, weight_decay_rate, init_type=InitType.RANDOM, epsilon=0.001):
+    def __init__(self, learning_rate, weight_decay_rate, init_type=InitType.RANDOM, epsilon=0.1):
         self.learning_rate = learning_rate
         self.weight_decay_rate = weight_decay_rate
         if init_type == InitType.NORMAL:
@@ -60,18 +60,14 @@ class Model:
         cross_entropy_2 = -(lbls_logits - activation_2) # total cross entropy across all images
         cross_entropy_1 = self.theta_1.dot(cross_entropy_2) * (activation_1 * (1 - activation_1))
 
-        modified_ce2 = np.repeat(cross_entropy_2.transpose().reshape(1, cross_entropy_2.shape[1], cross_entropy_2.shape[0]), self.theta_1.shape[0], axis=0)
-        modified_a1 = np.swapaxes(np.swapaxes(np.repeat(activation_1.reshape(1, activation_1.shape[0], activation_1.shape[1]), self.theta_1.shape[1], axis=0), 0, 1), 1, 2)
-        theta_gradient_1 = np.average(modified_a1 * modified_ce2, axis=1) + (self.weight_decay_rate * self.theta_1)
 
-        modified_ce1 = np.repeat(cross_entropy_1.transpose().reshape(1, cross_entropy_1.shape[1], cross_entropy_1.shape[0]), self.theta_0.shape[0], axis=0)
-        modified_a0 = np.swapaxes(np.swapaxes(np.repeat(imgs.reshape(1, imgs.shape[0], imgs.shape[1]), self.theta_0.shape[1], axis=0), 0, 1), 1, 2)
-        theta_gradient_0 = np.average(modified_a0 * modified_ce1, axis=1) + (self.weight_decay_rate * self.theta_0)
+
+        theta_gradient_1 = (activation_1.dot(cross_entropy_2.transpose()) / imgs.shape[1]) + (self.weight_decay_rate * self.theta_1)
+        theta_gradient_0 = (imgs.dot(cross_entropy_1.transpose()) / imgs.shape[1]) + (self.weight_decay_rate * self.theta_0)
 
         bias_gradient_1 = np.average(cross_entropy_2, axis=1)
         bias_gradient_0 = np.average(cross_entropy_1, axis=1)
 
-        # print(self.learning_rate * theta_gradient_1)
         self.theta_1 = self.theta_1 - (self.learning_rate * theta_gradient_1)
         self.theta_0 = self.theta_0 - (self.learning_rate * theta_gradient_0)
         self.bias_1 = self.bias_1 - (self.learning_rate * bias_gradient_1)
