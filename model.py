@@ -9,7 +9,7 @@ class InitType(Enum):
     EPSILON = 4
 
 class Model:
-    def __init__(self, learning_rate, weight_decay_rate, init_type=InitType.RANDOM, epsilon=0.1):
+    def __init__(self, learning_rate, weight_decay_rate, init_type=InitType.RANDOM, epsilon=0.01):
         self.learning_rate = learning_rate
         self.weight_decay_rate = weight_decay_rate
         if init_type == InitType.NORMAL:
