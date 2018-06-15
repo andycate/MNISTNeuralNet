@@ -4,10 +4,10 @@ import model
 
 data = da.Data()
 
-mod = model.Model(1, 0, init_type=model.InitType.NORMAL, epsilon=0.1)
+mod = model.Model(1, 0, (784, 256, 80, 10),init_type=model.InitType.NORMAL, epsilon=0.1)
 
 def accuracy():
-    predictions = (np.argmax(mod.predict(data.test_imgs)[3], axis=0) == data.test_lbls)
+    predictions = (np.argmax(mod.predict(data.test_imgs)[1][-1], axis=0) == data.test_lbls)
     print(np.sum(predictions) / predictions.size)
 
 accuracy()
